@@ -2,6 +2,9 @@ import argparse, sys
 import numpy as np
 
 
+epsilon = None
+
+
 class MDP:
     def __init__(self, S, A, T, R, gamma):
         self.S = S
@@ -72,7 +75,63 @@ def parse_policy(policy_file):
     return np.array(p)
 
 
+class algorithm:
+    def get_optimal_value_policy(self, mdp):
+        raise NotImplementedError
+
+    def evaluate_policy(self, mdp, policy):
+        T = mdp.T[np.arange(mdp.S), policy, :]
+        R = mdp.R[np.arange(mdp.S), policy, :]
+        return np.linalg.inv(np.identity(mdp.S) - mdp.gamma * T) @ ((T * R).sum(axis=1))
+
+
+class value_iteration(algorithm):
+    def get_optimal_value_policy(self, mdp):
+        V = np.random.randn(mdp.S)
+        while True:
+            Vt = (
+                (mdp.T * (mdp.R + mdp.gamma * V.reshape((1, 1, -1))))
+                .sum(axis=2)
+                .max(axis=1)
+            )
+            if (np.abs(Vt - V) < epsilon).all():
+                break
+            V = Vt
+        p = (
+            (mdp.T * (mdp.R + mdp.gamma * V.reshape((1, 1, -1))))
+            .sum(axis=2)
+            .argmax(axis=1)
+        )
+        return (V, p)
+
+
+class howard_policy_iteration(algorithm):
+    def get_optimal_value_policy(self, mdp):
+        p = np.random.randint(0, mdp.A, (mdp.S,))
+        Vp = self.evaluate_policy(mdp, p)
+        while True:
+            Qp = (mdp.T * (mdp.R + mdp.gamma * Vp.reshape((1, 1, -1)))).sum(axis=2)
+
+            z = np.where(Qp > Vp.reshape((-1, 1)) + epsilon)
+            IA = [(s, z[1][z[0] == s]) for s in range(mdp.S) if (z[0] == s).any()]
+            if len(IA) == 0:
+                break
+            for s, ia in IA:
+                p[s] = np.random.choice(ia)
+
+            Vp = self.evaluate_policy(mdp, p)
+
+        return (Vp, p)
+
+
+class linear_programming(algorithm):
+    def get_optimal_value_policy(self, mdp):
+        raise NotImplementedError
+
+
 if __name__ == "__main__":
+    epsilon = 1e-9
+
     args = None
     parser = argparse.ArgumentParser()
     parser.add_argument("--mdp", type=str)
@@ -80,17 +139,25 @@ if __name__ == "__main__":
     parser.add_argument("--policy", type=str, default=None)
     args = parser.parse_args()
 
-    mdp = parse_mdp(args.mdp)
-    policy = None
-    if args.policy != None:
+    assert args.algorithm in ["vi", "hpi", "lp"]
+
+    mdp: MDP = parse_mdp(args.mdp)
+
+    alg = None
+    if args.algorithm == "vi":
+        alg = value_iteration()
+    elif args.algorithm == "hpi":
+        alg = howard_policy_iteration()
+    else:
+        alg = linear_programming()
+
+    ans = None
+    if args.policy == None:
+        ans = alg.get_optimal_value_policy(mdp)
+    else:
         policy = parse_policy(args.policy)
+        ans = (alg.evaluate_policy(mdp, policy), policy)
 
-    print(args.mdp)
-    print(args.algorithm)
-    print(args.policy)
-
-    print(mdp.S)
-    print(mdp.A)
-    print(mdp.T)
-    print(mdp.R)
-    print(mdp.gamma)
+    ans = list(zip(list(ans[0]), list(ans[1])))
+    for vi, pi in ans:
+        print("%.6f" % (vi), pi)
