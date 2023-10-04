@@ -1,5 +1,6 @@
 import argparse, sys
 import numpy as np
+import pulp
 
 
 epsilon = None
@@ -126,7 +127,22 @@ class howard_policy_iteration(algorithm):
 
 class linear_programming(algorithm):
     def get_optimal_value_policy(self, mdp):
-        raise NotImplementedError
+        V = np.array([pulp.LpVariable(f"V_s{s}") for s in range(mdp.S)])
+        problem = pulp.LpProblem("mdp_lp", sense=pulp.LpMinimize)
+        for s in range(mdp.S):
+            for a in range(mdp.A):
+                problem += V[s] >= (mdp.T[s][a] * (mdp.R[s][a] + mdp.gamma * V)).sum()
+        problem += V.sum()
+        problem.solve(pulp.PULP_CBC_CMD(msg=0))
+
+        V = np.array([pulp.value(vs) for vs in list(V)])
+        p = (
+            (mdp.T * (mdp.R + mdp.gamma * V.reshape((1, 1, -1))))
+            .sum(axis=2)
+            .argmax(axis=1)
+        )
+
+        return (V, p)
 
 
 if __name__ == "__main__":
