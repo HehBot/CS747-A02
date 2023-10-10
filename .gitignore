@@ -1,3 +1,7 @@
 __pycache__/
 env747
 verify_attt_*
+*.txt
+!requirements.txt
+!virtual-env.txt
+!data/*/*.txt

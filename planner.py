@@ -1,9 +1,8 @@
 import argparse, sys
 import numpy as np
-import pulp
 
 
-epsilon = None
+epsilon = 1e-9
 
 
 class MDP:
@@ -65,9 +64,36 @@ def parse_mdp(mdp_file):
     gamma = float(line[1])
 
     if mdptype == "episodic":
+        assert end_states != None, "End states not specified for episodic MDP"
         return episodic_MDP(S, A, T, R, gamma, end_states)
     else:
+        assert end_states == None, "End states not specified for continuing MDP"
         return continuing_MDP(S, A, T, R, gamma)
+
+
+def print_mdp(mdp: MDP):
+    print(f"numStates {mdp.S}")
+    print(f"numActions {mdp.A}")
+    print("end ", end="")
+    if type(mdp) == episodic_MDP:
+        for e in mdp.end_states:
+            print(e, "", end="")
+        print()
+    else:
+        print("-1")
+    for s1 in range(mdp.S):
+        for a in range(mdp.A):
+            for s2 in range(mdp.S):
+                if mdp.T[s1][a][s2] > epsilon:
+                    print(
+                        f"transition {s1} {a} {s2} {mdp.R[s1][a][s2]} {mdp.T[s1][a][s2]}"
+                    )
+    print("mdptype ", end="")
+    if type(mdp) == episodic_MDP:
+        print("episodic")
+    else:
+        print("continuing")
+    print(f"discount {mdp.gamma}")
 
 
 def parse_policy(policy_file):
@@ -127,6 +153,8 @@ class howard_policy_iteration(algorithm):
 
 class linear_programming(algorithm):
     def get_optimal_value_policy(self, mdp):
+        import pulp
+
         V = np.array([pulp.LpVariable(f"V_s{s}") for s in range(mdp.S)])
         problem = pulp.LpProblem("mdp_lp", sense=pulp.LpMinimize)
         for s in range(mdp.S):
@@ -146,12 +174,9 @@ class linear_programming(algorithm):
 
 
 if __name__ == "__main__":
-    epsilon = 1e-9
-
-    args = None
     parser = argparse.ArgumentParser()
     parser.add_argument("--mdp", type=str)
-    parser.add_argument("--algorithm", type=str, default="vi")
+    parser.add_argument("--algorithm", type=str, default="hpi")
     parser.add_argument("--policy", type=str, default=None)
     args = parser.parse_args()
 
