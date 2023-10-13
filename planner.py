@@ -2,9 +2,6 @@ import numpy as np
 import scipy.sparse as sp
 
 
-epsilon = 1e-9
-
-
 class MDP:
     def __init__(self, S, A, T, R, gamma):
         self.S = S
@@ -70,13 +67,13 @@ def parse_mdp(mdp_file):
         assert end_states != None, "End states not specified for episodic MDP"
         return episodic_MDP(S, A, T, R, gamma, end_states)
     else:
-        assert end_states == None, "End states not specified for continuing MDP"
+        assert end_states == None, "End states specified for continuing MDP"
         return continuing_MDP(S, A, T, R, gamma)
 
 
 def print_mdp(mdp: MDP):
-    print(f"numStates {mdp.S}")
-    print(f"numActions {mdp.A}")
+    print("numStates %d" % (mdp.S))
+    print("numActions %d" % (mdp.A))
     print("end ", end="")
     if type(mdp) == episodic_MDP:
         for e in mdp.end_states:
@@ -87,13 +84,13 @@ def print_mdp(mdp: MDP):
     for s1 in range(mdp.S):
         coo = sp.coo_array(mdp.T[s1])
         for a, s2, t in zip(coo.row, coo.col, coo.data):
-            print(f"transition {s1} {a} {s2} {mdp.R[s1][a,s2]} {t}")
+            print("transition %d %d %d %0.7f %0.7f" % (s1, a, s2, mdp.R[s1][a, s2], t))
     print("mdptype ", end="")
     if type(mdp) == episodic_MDP:
         print("episodic")
     else:
         print("continuing")
-    print(f"discount {mdp.gamma}")
+    print("discount %f" % (mdp.gamma))
 
 
 def parse_policy(policy_file):
@@ -125,6 +122,7 @@ class algorithm:
 class value_iteration(algorithm):
     def get_optimal_value_policy(self, mdp):
         V = np.random.randn(mdp.S)
+        epsilon = 1e-7
         while True:
             Vsp = V.reshape((1, -1)) + np.zeros((mdp.A, mdp.S))
             Vsp = sp.csc_array(Vsp)
@@ -134,6 +132,7 @@ class value_iteration(algorithm):
                     for s in range(mdp.S)
                 ]
             )
+            print(np.abs(Vt - V).mean())
             if (np.abs(Vt - V) < epsilon).all():
                 break
             V = Vt
@@ -152,6 +151,7 @@ class howard_policy_iteration(algorithm):
     def get_optimal_value_policy(self, mdp):
         p = np.random.randint(0, mdp.A, (mdp.S,))
         Vp = self.evaluate_policy(mdp, p)
+        epsilon = 1e-6
         while True:
             Vsp = Vp.reshape((1, -1)) + np.zeros((mdp.A, mdp.S))
             Vsp = sp.csc_array(Vsp)
