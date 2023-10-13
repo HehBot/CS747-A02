@@ -1,4 +1,5 @@
 import numpy as np
+import scipy.sparse as sp
 
 
 epsilon = 1e-9
@@ -11,8 +12,11 @@ class MDP:
         self.T = T
         self.R = R
         self.gamma = gamma
-        assert T.shape == (S, A, S)
-        assert R.shape == (S, A, S)
+        assert T.shape == (S,)
+        assert R.shape == (S,)
+        for s in range(S):
+            assert T[s].shape == (A, S)
+            assert R[s].shape == (A, S)
 
 
 class continuing_MDP(MDP):
@@ -44,14 +48,14 @@ def parse_mdp(mdp_file):
         end_states = None
 
     line = f.readline().strip().split()
-    T = np.zeros((S, A, S), dtype=np.float32)
-    R = np.zeros((S, A, S), dtype=np.float32)
+    T = np.array([sp.lil_array((A, S)) for s in range(S)])
+    R = np.array([sp.lil_array((A, S)) for s in range(S)])
     while line[0] == "transition":
         s1 = int(line[1])
         a = int(line[2])
         s2 = int(line[3])
-        R[s1][a][s2] = float(line[4])
-        T[s1][a][s2] = float(line[5])
+        R[s1][a, s2] = float(line[4])
+        T[s1][a, s2] = float(line[5])
         line = f.readline().strip().split()
 
     assert line[0] == "mdptype"
@@ -81,12 +85,9 @@ def print_mdp(mdp: MDP):
     else:
         print("-1")
     for s1 in range(mdp.S):
-        for a in range(mdp.A):
-            for s2 in range(mdp.S):
-                if mdp.T[s1][a][s2] > epsilon:
-                    print(
-                        f"transition {s1} {a} {s2} {mdp.R[s1][a][s2]} {mdp.T[s1][a][s2]}"
-                    )
+        coo = sp.coo_array(mdp.T[s1])
+        for a, s2, t in zip(coo.row, coo.col, coo.data):
+            print(f"transition {s1} {a} {s2} {mdp.R[s1][a,s2]} {t}")
     print("mdptype ", end="")
     if type(mdp) == episodic_MDP:
         print("episodic")
@@ -106,27 +107,43 @@ class algorithm:
         raise NotImplementedError
 
     def evaluate_policy(self, mdp, policy):
-        T = mdp.T[np.arange(mdp.S), policy, :]
-        R = mdp.R[np.arange(mdp.S), policy, :]
-        return np.linalg.inv(np.identity(mdp.S) - mdp.gamma * T) @ ((T * R).sum(axis=1))
+        T = sp.csc_array(
+            np.array(
+                [mdp.T[s][[policy[s]], :].toarray().flatten() for s in range(mdp.S)]
+            )
+        )
+        R = sp.csc_array(
+            np.array(
+                [mdp.R[s][[policy[s]], :].toarray().flatten() for s in range(mdp.S)]
+            )
+        )
+        return sp.linalg.inv(sp.identity(mdp.S).tocsc() - mdp.gamma * T) @ (
+            (T * R).sum(axis=1)
+        )
 
 
 class value_iteration(algorithm):
     def get_optimal_value_policy(self, mdp):
         V = np.random.randn(mdp.S)
         while True:
-            Vt = (
-                (mdp.T * (mdp.R + mdp.gamma * V.reshape((1, 1, -1))))
-                .sum(axis=2)
-                .max(axis=1)
+            Vsp = V.reshape((1, -1)) + np.zeros((mdp.A, mdp.S))
+            Vsp = sp.csc_array(Vsp)
+            Vt = np.array(
+                [
+                    (mdp.T[s] * (mdp.R[s] + mdp.gamma * Vsp)).sum(axis=1).max(axis=0)
+                    for s in range(mdp.S)
+                ]
             )
             if (np.abs(Vt - V) < epsilon).all():
                 break
             V = Vt
-        p = (
-            (mdp.T * (mdp.R + mdp.gamma * V.reshape((1, 1, -1))))
-            .sum(axis=2)
-            .argmax(axis=1)
+        Vsp = V.reshape((1, -1)) + np.zeros((mdp.A, mdp.S))
+        Vsp = sp.csc_array(Vsp)
+        p = np.array(
+            [
+                (mdp.T[s] * (mdp.R[s] + mdp.gamma * Vsp)).sum(axis=1).argmax(axis=0)
+                for s in range(mdp.S)
+            ]
         )
         return (V, p)
 
@@ -136,7 +153,14 @@ class howard_policy_iteration(algorithm):
         p = np.random.randint(0, mdp.A, (mdp.S,))
         Vp = self.evaluate_policy(mdp, p)
         while True:
-            Qp = (mdp.T * (mdp.R + mdp.gamma * Vp.reshape((1, 1, -1)))).sum(axis=2)
+            Vsp = Vp.reshape((1, -1)) + np.zeros((mdp.A, mdp.S))
+            Vsp = sp.csc_array(Vsp)
+            Qp = np.array(
+                [
+                    (mdp.T[s] * (mdp.R[s] + mdp.gamma * Vsp)).sum(axis=1)
+                    for s in range(mdp.S)
+                ]
+            )
 
             z = np.where(Qp > Vp.reshape((-1, 1)) + epsilon)
             IA = [(s, z[1][z[0] == s]) for s in range(mdp.S) if (z[0] == s).any()]
@@ -158,15 +182,20 @@ class linear_programming(algorithm):
         problem = pulp.LpProblem("mdp_lp", sense=pulp.LpMinimize)
         for s in range(mdp.S):
             for a in range(mdp.A):
-                problem += V[s] >= (mdp.T[s][a] * (mdp.R[s][a] + mdp.gamma * V)).sum()
+                t = mdp.T[s][[a], :].toarray().flatten()
+                r = mdp.R[s][[a], :].toarray().flatten()
+                problem += V[s] >= (t * (r + mdp.gamma * V)).sum()
         problem += V.sum()
         problem.solve(pulp.PULP_CBC_CMD(msg=0))
 
         V = np.array([pulp.value(vs) for vs in list(V)])
-        p = (
-            (mdp.T * (mdp.R + mdp.gamma * V.reshape((1, 1, -1))))
-            .sum(axis=2)
-            .argmax(axis=1)
+        Vsp = V.reshape((1, -1)) + np.zeros((mdp.A, mdp.S))
+        Vsp = sp.csc_array(Vsp)
+        p = np.array(
+            [
+                (mdp.T[s] * (mdp.R[s] + mdp.gamma * Vsp)).sum(axis=1).argmax(axis=0)
+                for s in range(mdp.S)
+            ]
         )
 
         return (V, p)
@@ -201,7 +230,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--mdp", type=str)
-    parser.add_argument("--algorithm", type=str, default="hpi")
+    parser.add_argument("--algorithm", type=str, default="vi")
     parser.add_argument("--policy", type=str, default=None)
     args = parser.parse_args()
 
