@@ -16,7 +16,7 @@ def coords_to_index(pos):
     return 4 * (3 - pos[1]) + pos[0] + 1
 
 
-S = 2 + ((16 * (16 - 1) // 2) + 16) * 16 * 2
+S = 2 + 16 * 16 * 16
 A = 10
 A_opp = 4
 
@@ -30,26 +30,30 @@ def state_to_index(s):
     b0 = coords_to_index(b[0]) - 1
     b1 = coords_to_index(b[1]) - 1
     opp = coords_to_index(opp) - 1
-    return (
-        poss * (((16 * (16 - 1) // 2) + 16) * 16)
-        + opp * ((16 * (16 - 1) // 2) + 16)
-        + ((b1 * (b1 + 1)) // 2)
-        + b0
-    )
+
+    if b0 > b1:
+        b0, b1 = b1, b0
+        poss = 1 - poss
+    elif b0 == b1:
+        poss = 0
+
+    return (16 * 16) * opp + b1 * b1 + 2 * b0 + poss
 
 
 states = [None for s in range(S)]
 states[state_to_index("loss")] = "loss"
 states[state_to_index("win")] = "win"
-for poss in range(2):
-    for opp in range(1, 16 + 1):
-        for b1 in range(1, 16 + 1):
-            for b0 in range(1, b1 + 1):
-                b0c = index_to_coords(b0)
-                b1c = index_to_coords(b1)
-                oppc = index_to_coords(opp)
+for opp in range(1, 16 + 1):
+    oppc = index_to_coords(opp)
+    for b1 in range(1, 16 + 1):
+        b1c = index_to_coords(b1)
+        for b0 in range(1, b1):
+            b0c = index_to_coords(b0)
+            for poss in range(2):
                 state = ((b0c, b1c), oppc, poss)
                 states[state_to_index(state)] = state
+        state = ((b1c, b1c), oppc, 0)
+        states[state_to_index(state)] = state
 
 
 def parse_opponent(opponent_file):

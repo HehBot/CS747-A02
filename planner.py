@@ -1,4 +1,3 @@
-import argparse, sys
 import numpy as np
 
 
@@ -45,8 +44,8 @@ def parse_mdp(mdp_file):
         end_states = None
 
     line = f.readline().strip().split()
-    T = np.zeros((S, A, S))
-    R = np.zeros((S, A, S))
+    T = np.zeros((S, A, S), dtype=np.float32)
+    R = np.zeros((S, A, S), dtype=np.float32)
     while line[0] == "transition":
         s1 = int(line[1])
         a = int(line[2])
@@ -173,32 +172,37 @@ class linear_programming(algorithm):
         return (V, p)
 
 
+def main(mdp_file, algorithm, policy_file):
+    assert algorithm in ["vi", "hpi", "lp"]
+    alg = None
+    if algorithm == "vi":
+        alg = value_iteration()
+    elif algorithm == "hpi":
+        alg = howard_policy_iteration()
+    else:
+        alg = linear_programming()
+
+    mdp: MDP = parse_mdp(mdp_file)
+
+    ans = None
+    if policy_file == None:
+        ans = alg.get_optimal_value_policy(mdp)
+    else:
+        policy = parse_policy(policy_file)
+        ans = (alg.evaluate_policy(mdp, policy), policy)
+
+    ans = list(zip(list(ans[0]), list(ans[1])))
+    for vi, pi in ans:
+        print("%.6f" % (vi), pi)
+
+
 if __name__ == "__main__":
+    import argparse
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--mdp", type=str)
     parser.add_argument("--algorithm", type=str, default="hpi")
     parser.add_argument("--policy", type=str, default=None)
     args = parser.parse_args()
 
-    assert args.algorithm in ["vi", "hpi", "lp"]
-
-    mdp: MDP = parse_mdp(args.mdp)
-
-    alg = None
-    if args.algorithm == "vi":
-        alg = value_iteration()
-    elif args.algorithm == "hpi":
-        alg = howard_policy_iteration()
-    else:
-        alg = linear_programming()
-
-    ans = None
-    if args.policy == None:
-        ans = alg.get_optimal_value_policy(mdp)
-    else:
-        policy = parse_policy(args.policy)
-        ans = (alg.evaluate_policy(mdp, policy), policy)
-
-    ans = list(zip(list(ans[0]), list(ans[1])))
-    for vi, pi in ans:
-        print("%.6f" % (vi), pi)
+    main(args.mdp, args.algorithm, args.policy)

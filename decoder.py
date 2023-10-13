@@ -1,16 +1,5 @@
-import argparse
 import numpy as np
 from football_util import states, index_to_coords, state_to_index
-
-
-def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--opponent", type=str)
-    parser.add_argument("--value-policy", type=str)
-    args = parser.parse_args()
-    assert args.opponent != None, "Opponent file not specified"
-    assert args.value_policy != None, "Value-policy file not specified"
-    return (args.opponent, args.value_policy)
 
 
 def parse_value_policy(value_policy_file):
@@ -26,8 +15,7 @@ def parse_value_policy(value_policy_file):
     return (np.array(V), np.array(P))
 
 
-def main():
-    opponent_file, value_policy_file = parse_args()
+def main(opponent_file, value_policy_file):
     value, policy = parse_value_policy(value_policy_file)
 
     f = open(opponent_file)
@@ -49,4 +37,13 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--opponent", type=str)
+    parser.add_argument("--value-policy", type=str)
+    args = parser.parse_args()
+    assert args.opponent != None, "Opponent file not specified"
+    assert args.value_policy != None, "Value-policy file not specified"
+
+    main(args.opponent, args.value_policy)
