@@ -1,5 +1,4 @@
 import numpy as np
-from planner import episodic_MDP, print_mdp
 from football_util import (
     S,
     A,
@@ -37,10 +36,16 @@ def in_line(pos0, pos_middle, pos1):
         return False
     if (pos0[1] - pos_middle[1]) * (pos1[1] - pos_middle[1]) > 0:
         return False
-    # return (pos0[0] - pos_middle[0]) * (pos1[1] - pos_middle[1]) == (pos0[1] - pos_middle[1]) * (pos1[0] - pos_middle[0]) and (pos0[0] - pos_middle[0]) * (pos1[1] - pos_middle[1]) == (pos0[0] - pos_middle[0]) * (pos1[0] - pos_middle[0])
-    return (pos0[0] * pos1[1] - pos0[1] * pos1[0]) == pos_middle[1] * (
-        pos0[0] - pos1[0]
-    ) + pos_middle[0] * (pos1[1] - pos0[1])
+    return (
+        (pos0[0] == pos_middle[0] and pos1[0] == pos_middle[0])
+        or (pos0[1] == pos_middle[1] and pos1[1] == pos_middle[1])
+        or (
+            (pos0[0] - pos_middle[0]) * (pos1[1] - pos_middle[1])
+            == (pos0[1] - pos_middle[1]) * (pos1[0] - pos_middle[0])
+            and abs(pos0[0] - pos_middle[0]) == abs(pos0[1] - pos_middle[1])
+            and abs(pos1[0] - pos_middle[0]) == abs(pos1[1] - pos_middle[1])
+        )
+    )
 
 
 def main(opponent_file, p, q):
@@ -75,14 +80,14 @@ def main(opponent_file, p, q):
                 new_poss = old_poss
 
                 if out_of_bounds(new_b[0]):
-                    T[action][loss_s] = 1.0
+                    T[action][loss_s] += 1.0 * opp_prob
                 else:
                     # movement
                     if old_poss == 0:
                         cond_prob = 1.0 - 2.0 * p
                         # tackling
-                        if new_b[new_poss] == new_opp or (
-                            new_b[new_poss] == old_opp and old_b[old_poss] == new_opp
+                        if new_b[0] == new_opp or (
+                            new_b[0] == old_opp and old_b[0] == new_opp
                         ):
                             cond_prob *= 0.5
                     else:
@@ -99,14 +104,14 @@ def main(opponent_file, p, q):
                 new_poss = old_poss
 
                 if out_of_bounds(new_b[1]):
-                    T[action][loss_s] = 1.0
+                    T[action][loss_s] += 1.0 * opp_prob
                 else:
                     # movement
                     if old_poss == 1:
                         cond_prob = 1.0 - 2.0 * p
                         # tackling
-                        if new_b[new_poss] == new_opp or (
-                            new_b[new_poss] == old_opp and old_b[old_poss] == new_opp
+                        if new_b[1] == new_opp or (
+                            new_b[1] == old_opp and old_b[1] == new_opp
                         ):
                             cond_prob *= 0.5
                     else:
