@@ -2,6 +2,9 @@ import numpy as np
 import scipy.sparse as sp
 
 
+epsilon = 1e-9
+
+
 class MDP:
     def __init__(self, S, A, T, R, gamma):
         self.S = S
@@ -122,36 +125,51 @@ class algorithm:
 class value_iteration(algorithm):
     def get_optimal_value_policy(self, mdp):
         V = np.random.randn(mdp.S)
-        epsilon = 1e-7
-        while True:
+        if mdp.S**2 * mdp.A < 1e8:
+            T = np.array([mdp.T[s].toarray() for s in range(mdp.S)])
+            R = np.array([mdp.R[s].toarray() for s in range(mdp.S)])
+            while True:
+                Vt = (
+                    (T * (R + mdp.gamma * V.reshape((1, 1, -1))))
+                    .sum(axis=2)
+                    .max(axis=1)
+                )
+                if np.abs(Vt - V).max() < epsilon:
+                    break
+                V = Vt
+            p = (T * (R + mdp.gamma * V.reshape((1, 1, -1)))).sum(axis=2).argmax(axis=1)
+            return (V, p)
+        else:
+            while True:
+                Vsp = V.reshape((1, -1)) + np.zeros((mdp.A, mdp.S))
+                Vsp = sp.csc_array(Vsp)
+                Vt = np.array(
+                    [
+                        (mdp.T[s] * (mdp.R[s] + mdp.gamma * Vsp))
+                        .sum(axis=1)
+                        .max(axis=0)
+                        for s in range(mdp.S)
+                    ]
+                )
+                print(np.abs(Vt - V).max())
+                if np.abs(Vt - V).max() < epsilon:
+                    break
+                V = Vt
             Vsp = V.reshape((1, -1)) + np.zeros((mdp.A, mdp.S))
             Vsp = sp.csc_array(Vsp)
-            Vt = np.array(
+            p = np.array(
                 [
-                    (mdp.T[s] * (mdp.R[s] + mdp.gamma * Vsp)).sum(axis=1).max(axis=0)
+                    (mdp.T[s] * (mdp.R[s] + mdp.gamma * Vsp)).sum(axis=1).argmax(axis=0)
                     for s in range(mdp.S)
                 ]
             )
-            print(np.abs(Vt - V).mean())
-            if (np.abs(Vt - V) < epsilon).all():
-                break
-            V = Vt
-        Vsp = V.reshape((1, -1)) + np.zeros((mdp.A, mdp.S))
-        Vsp = sp.csc_array(Vsp)
-        p = np.array(
-            [
-                (mdp.T[s] * (mdp.R[s] + mdp.gamma * Vsp)).sum(axis=1).argmax(axis=0)
-                for s in range(mdp.S)
-            ]
-        )
-        return (V, p)
+            return (V, p)
 
 
 class howard_policy_iteration(algorithm):
     def get_optimal_value_policy(self, mdp):
         p = np.random.randint(0, mdp.A, (mdp.S,))
         Vp = self.evaluate_policy(mdp, p)
-        epsilon = 1e-6
         while True:
             Vsp = Vp.reshape((1, -1)) + np.zeros((mdp.A, mdp.S))
             Vsp = sp.csc_array(Vsp)
@@ -230,7 +248,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--mdp", type=str)
-    parser.add_argument("--algorithm", type=str, default="vi")
+    parser.add_argument("--algorithm", type=str, default="hpi")
     parser.add_argument("--policy", type=str, default=None)
     args = parser.parse_args()
 
