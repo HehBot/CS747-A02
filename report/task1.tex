@@ -1,0 +1,11 @@
+\section*{Task 1: MDP Planning Algorithms}
+
+The code contains an abstract class \lstinline{MDP} which implements functions like \lstinline{evaluate_policy} (returns $V$ for given policy) and \lstinline{get_state_action_function} (returns $Q$ for given $V$), common to both continuing and episodic MDPs. In order to be able to handle large number of states with sparse transitions, I use the \lstinline{scipy.sparse} module, which provides implementations for sparse matrix operations. However these become slow when the matrices are not sparse, so the code checks the size of the MDP and if it is lower than a threshold ($S\times A\times S < 10^8$), switches to using \lstinline{numpy} arrays for operations.
+
+For MDP $(S, A, T, R, \gamma)$, we define the following functions
+\begin{align*}
+    Q_f(V)(s, a) &= \sum\limits_{s'\in S}T(s, a, s')\left(R(s, a, s') + \gamma V(s)\right) \\
+    B^*(V)(s) &= \max\limits_{a\in A} Q(V)(s, a) \\
+    V_f(\pi)(s) &= \left(I-\gamma T\right)^{-1}\sum_{s'\in S}T(s, \pi(s), s')R(s, \pi(s), s')
+\end{align*}
+The functions \lstinline{evaluate_policy} and \lstinline{get_state_action_function} implement $V_f$ and $Q_f$ respectively.

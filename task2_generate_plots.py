@@ -78,7 +78,7 @@ if __name__ == "__main__":
     plt.rc("text", usetex=True)
     plt.rc("text.latex", preamble=r"\usepackage{amsfonts}")
 
-    req_state = ((index_to_coords(5), index_to_coords(9)), index_to_coords(8), 1)
+    req_state = ((index_to_coords(5), index_to_coords(9)), index_to_coords(8), 0)
     req_s = state_to_index(req_state)
 
     graph1(

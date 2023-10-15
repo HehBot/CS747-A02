@@ -1,0 +1,7 @@
+*.aux
+*.pdf
+*.out
+*.fls
+*.fdb_latexmk
+*.log
+svg-inkscape/*

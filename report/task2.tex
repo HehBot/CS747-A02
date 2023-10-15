@@ -1,0 +1,37 @@
+\section*{Task 2: Football}
+\subsection*{State encoding}
+We represent states as $((b_0, b_1), r, p)$ where $b_0 = (b_{0x}, b_{0y}), b_1 = (b_{1x}, b_{1y})\in\{0,1,2,3\}^2$ are our player coordinates, $r = (r_x, r_y)\in\{0,1,2,3\}^2$ is opponent player's coordinates and $p\in{0,1}$ represents possession.
+We are given that both our players are identical, thus the states $((b_1, b_0), r, p)$ and $((b_1, b_0), r, 1 - p)$ are equivalent. Using this along with the convention that player 0 is the player on the lower index square, we arrive at the following encoding of state
+
+$$s = 256i_r + i_{b_1}^2 + 2i_{b_0} + p$$
+
+where $i_p$ is the index of position of player $p$,
+
+$$i_p = 4(3-p_y) + p_x + 1$$
+
+This encoding results in 4096 states for the game, along with 2 terminal states for losing and winning.
+
+We iterate through all states, all opponent actions and all our possible actions, adding to the relevant entry in the transition matrix product of conditional probability and opponent action probability. This is according to the following equation
+
+$$\mathbb{P}\left(s'\middle|s, a\right) = \sum\limits_{a_\text{opp}}f\left(s', a\right)\mathbb{P}(a_\text{opp})\mathds{1}\left[s\xrightarrow[a_\text{opp}]{a}s'\right]$$
+
+where the last indicator function is 1 if the two actions actually cause state to change from $s$ to $s'$ and $f$ is the conditional probability relating to success or failure of movement, tackle, pass, or shoot.
+
+\subsection*{Graphs}
+
+\begin{figure}[h]
+    \begin{subfigure}[b]{0.5\textwidth}
+        \centering
+        \includesvg[width=\linewidth]{graph1.svg}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.5\textwidth}
+        \centering
+        \includesvg[width=\linewidth]{graph2.svg}
+    \end{subfigure}
+    \caption{Variation of $\mathbb{E}[G]$ with $p$ and $q$}
+\end{figure}
+The above graphs show variation of expected number of goals for the start state $(((0, 2), (0, 1)), (3, 2), 0)$, obtained by running \lstinline{python task_2_generate_plots.py}
+
+For graph 1, the quantity $p$ appears in the probability of successful movement, $1-2p$ with the ball and $1-p$ without, i.e., failure is more likely with increasing $p$. So we would expect that expected number of goals would decrease with increasing $p$, which is indeed observed.
+
+For graph 2, the quantity $q$ appears in the probability of successful goal-scoring and successful passing, both of which increase with increasing $q$. So we would expect number of goals would increase with increasing $q$, which is observed.
