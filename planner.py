@@ -103,7 +103,11 @@ class episodic_MDP(MDP):
 
 
 def parse_mdp(mdp_file):
-    f = open(mdp_file, "r")
+    f = None
+    if mdp_file == None:
+        f = open(0, "r")
+    else:
+        f = open(mdp_file, "r")
 
     line = f.readline().strip().split()
     assert line[0] == "numStates"
@@ -138,6 +142,8 @@ def parse_mdp(mdp_file):
     assert line[0] == "discount"
     gamma = float(line[1])
 
+    f.close()
+
     if mdptype == "episodic":
         assert end_states != None, "End states not specified for episodic MDP"
         return episodic_MDP(S, A, T, R, gamma, end_states)
@@ -149,6 +155,7 @@ def parse_mdp(mdp_file):
 def parse_policy(policy_file):
     f = open(policy_file, "r")
     p = [int(x.strip().split()[0]) for x in f]
+    f.close()
     return np.array(p)
 
 
@@ -231,7 +238,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mdp", type=str, required=True, help="MDP_FILE")
+    parser.add_argument("--mdp", type=str, default=None, help="MDP_FILE")
     parser.add_argument("--algorithm", type=str, default="hpi", help="ALGORITHM")
     parser.add_argument("--policy", type=str, default=None, help="POLICY_FILE")
     args = parser.parse_args()
