@@ -151,7 +151,7 @@ def main(opponent_file, p, q):
             for s2 in range(S):
                 if T[a][s2] > 1e-7:
                     print(
-                        "transition %d %d %d %0.7f %0.7f"
+                        "transition %d %d %d %0.8f %0.8f"
                         % (s, a, s2, R[a][s2], T[a][s2])
                     )
 
@@ -163,9 +163,9 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--opponent", type=str)
-    parser.add_argument("--p", type=float)
-    parser.add_argument("--q", type=float)
+    parser.add_argument("--opponent", type=str, required=True, help="OPPONENT_FILE")
+    parser.add_argument("--p", type=float, required=True, help="P")
+    parser.add_argument("--q", type=float, required=True, help="Q")
     args = parser.parse_args()
     assert args.opponent != None, "Opponent file not specified"
     assert args.p != None, "p not specified"
